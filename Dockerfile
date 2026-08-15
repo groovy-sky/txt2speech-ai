@@ -33,10 +33,6 @@ RUN mkdir -p /model \
 
 FROM debian:${DEBIAN_VERSION}
 
-LABEL org.opencontainers.image.source="https://github.com/groovy-sky/txt2speech-ai" \
-      org.opencontainers.image.description="CPU text-to-speech using NVIDIA Magpie TTS Multilingual 357M" \
-      org.opencontainers.image.licenses="MIT AND LicenseRef-NVIDIA-Open-Model-License"
-
 RUN apt-get update \
     && apt-get install --no-install-recommends --yes libgomp1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
