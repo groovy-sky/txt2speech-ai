@@ -35,14 +35,20 @@ RUN mkdir -p /model \
 FROM debian:${DEBIAN_VERSION}
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends --yes libgomp1 libstdc++6 \
+    && apt-get install --no-install-recommends --yes \
+        ffmpeg \
+        libgomp1 \
+        libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir /output
 
 COPY --from=builder /src/build/examples/cli/magpie-cli /usr/local/bin/magpie-cli
 COPY --from=builder /model/model.gguf /opt/magpie/model.gguf
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /output
 VOLUME ["/output"]
 
-ENTRYPOINT ["magpie-cli", "say", "--model", "/opt/magpie/model.gguf"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
