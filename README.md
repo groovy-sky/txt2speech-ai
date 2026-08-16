@@ -1,22 +1,38 @@
 # Magpie TTS Docker image
 
-Minimal CPU-only container for converting text to a WAV file with NVIDIA's
-[`magpie_tts_multilingual_357m.v2602.f16.gguf`](https://huggingface.co/nvidia/magpie_tts_multilingual_357m/blob/main/magpie_tts_multilingual_357m.v2602.f16.gguf).
-Inference uses the dependency-light
-[`magpie-tts.cpp`](https://github.com/mudler/magpie-tts.cpp) runtime, so the
-final image contains no Python, PyTorch, NeMo, CUDA, compilers, or source code.
+Minimal CPU-only container for converting text to a WAV file using the
+[`magpie-tts.cpp`](https://github.com/mudler/magpie-tts.cpp) runtime.  The
+default model is the F16 GGUF from the compatible prebuilt collection
+[`mudler/magpie-tts.cpp-gguf`](https://huggingface.co/mudler/magpie-tts.cpp-gguf):
+
+> `magpie-tts-multilingual-357m-f16.gguf`
+
+The final image contains no Python, PyTorch, NeMo, CUDA, compilers, or source
+code.
 
 ## Build
 
-The build downloads the model (about 1 GB) into the image:
+The build downloads the model (~784 MB) into the image:
 
 ```sh
 docker build -t txt2speech-ai .
 ```
 
-The inference runtime is pinned to a tested commit. Override
-`MAGPIE_TTS_REF` or `MODEL_URL` with Docker build arguments when intentionally
-upgrading either artifact.
+The inference runtime is pinned to a tested commit. Override `MAGPIE_TTS_REF`
+or `MODEL_URL` with Docker build arguments when intentionally upgrading either
+artifact.  Any replacement model **must** be a GGUF that carries the
+`magpie.*` metadata expected by this runtime (i.e. sourced from
+`mudler/magpie-tts.cpp-gguf` or converted with the same tooling).  A
+build-time smoke test (`magpie-cli info`) will fail the image build
+immediately if an incompatible GGUF is supplied.
+
+For a smaller image you can use the quantised variant instead:
+
+```sh
+docker build \
+  --build-arg MODEL_URL=https://huggingface.co/mudler/magpie-tts.cpp-gguf/resolve/main/magpie-tts-multilingual-357m-q8_0.gguf \
+  -t txt2speech-ai .
+```
 
 ## Convert text to audio
 
@@ -38,5 +54,6 @@ Optional flags include `--seed N` for deterministic generation and
 `John`, `Leo`, and `Sofia`. Supported language codes are `en`, `es`, `de`,
 `fr`, `it`, `pt-BR`, `hi`, `vi`, `ko`, `ar-AE`, `ar-SA`, and `ar-MSA`.
 
-The runtime is MIT licensed. The model weights remain subject to the
-[NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/).
+The runtime is MIT licensed. The model weights are distributed under the
+[`mudler/magpie-tts.cpp-gguf`](https://huggingface.co/mudler/magpie-tts.cpp-gguf)
+repository license.
