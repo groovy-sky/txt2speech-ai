@@ -6,6 +6,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -13,21 +14,41 @@ import (
 )
 
 func main() {
-	text := flag.String("text", "", "input text to split into chunks (required)")
-	flag.Parse()
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
 
-	if strings.TrimSpace(*text) == "" {
-		fmt.Fprintln(os.Stderr, "textchunks: --text is required and must not be empty")
-		os.Exit(2)
+func run(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("textchunks", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	text := fs.String("text", "", "input text to split into chunks (required)")
+	maxWords := fs.Int("max-words", 0, "maximum words per chunk (optional)")
+	maxChars := fs.Int("max-chars", 0, "maximum characters/runes per chunk (optional)")
+	longformThreshold := fs.Int("longform-threshold", 0, "minimum text length that triggers longform chunking (optional)")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
 	}
 
-	chunks, err := textprep.Prepare(*text, textprep.DefaultConfig())
+	if strings.TrimSpace(*text) == "" {
+		fmt.Fprintln(stderr, "textchunks: --text is required and must not be empty")
+		return 2
+	}
+
+	cfg := textprep.Config{
+		MaxWordsPerChunk:  *maxWords,
+		MaxCharsPerChunk:  *maxChars,
+		LongformThreshold: *longformThreshold,
+	}
+	chunks, err := textprep.Prepare(*text, cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "textchunks: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "textchunks: %v\n", err)
+		return 1
 	}
 
 	for _, chunk := range chunks {
-		fmt.Println(chunk.Text)
+		fmt.Fprintln(stdout, chunk.Text)
 	}
+
+	return 0
 }

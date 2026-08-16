@@ -237,6 +237,45 @@ func TestPrepareBehavior(t *testing.T) {
 		}
 	})
 
+	t.Run("unicode sentence punctuation", func(t *testing.T) {
+		got, err := Prepare("こんにちは。世界！またね？", Config{
+			MaxWordsPerChunk:  1,
+			MaxCharsPerChunk:  12,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		want := []string{"こんにちは。", "世界！", "またね？"}
+		if len(got) != len(want) {
+			t.Fatalf("got %d chunks %#v, want %d", len(got), got, len(want))
+		}
+		for i := range want {
+			if got[i].Text != want[i] {
+				t.Fatalf("chunk %d = %q, want %q", i, got[i].Text, want[i])
+			}
+		}
+	})
+
+	t.Run("unicode fallback punctuation", func(t *testing.T) {
+		got, err := Prepare("第一節、第二節、第三節、第四節", Config{
+			MaxWordsPerChunk:  1,
+			MaxCharsPerChunk:  5,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		if len(got) < 2 {
+			t.Fatalf("expected multiple chunks, got %#v", got)
+		}
+		for _, chunk := range got {
+			if chunk.Chars > 5 {
+				t.Fatalf("chunk exceeds limit: %#v", chunk)
+			}
+		}
+	})
+
 	t.Run("deterministic metadata", func(t *testing.T) {
 		got, err := Prepare("One. Two.", Config{
 			MaxWordsPerChunk:  1,
