@@ -299,4 +299,133 @@ func TestPrepareBehavior(t *testing.T) {
 			t.Fatal("expected error for invalid config")
 		}
 	})
+
+	// --- sentence-splitting and long-text chunk tests ---
+
+	t.Run("short text is one chunk", func(t *testing.T) {
+		got, err := Prepare("Hello from Magpie.", Config{})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("expected 1 chunk, got %d: %#v", len(got), got)
+		}
+	})
+
+	t.Run("multi-sentence becomes multiple chunks when forced", func(t *testing.T) {
+		// Use tight limits to force each sentence into its own chunk.
+		got, err := Prepare("First sentence. Second sentence. Third sentence.", Config{
+			MaxWordsPerChunk:  2,
+			MaxCharsPerChunk:  20,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		if len(got) < 2 {
+			t.Fatalf("expected multiple chunks, got %d: %#v", len(got), got)
+		}
+		// Chunks must be in order.
+		for i, c := range got {
+			if c.Index != i {
+				t.Fatalf("chunk %d has wrong index %d", i, c.Index)
+			}
+		}
+	})
+
+	t.Run("chunks are non-empty", func(t *testing.T) {
+		got, err := Prepare("Alpha. Beta. Gamma.", Config{
+			MaxWordsPerChunk:  1,
+			MaxCharsPerChunk:  10,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		for _, c := range got {
+			if strings.TrimSpace(c.Text) == "" {
+				t.Fatalf("empty chunk found: %#v", c)
+			}
+		}
+	})
+
+	t.Run("content is fully preserved across chunks", func(t *testing.T) {
+		input := "The quick brown fox. Jumped over the lazy dog. And ran away fast."
+		got, err := Prepare(input, Config{
+			MaxWordsPerChunk:  4,
+			MaxCharsPerChunk:  30,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		var joined strings.Builder
+		for _, c := range got {
+			if joined.Len() > 0 {
+				joined.WriteString(" ")
+			}
+			joined.WriteString(c.Text)
+		}
+		// Every word from the original must appear in the reassembled text.
+		for _, word := range strings.Fields(input) {
+			word = strings.Trim(word, ".?,!")
+			if !strings.Contains(joined.String(), word) {
+				t.Fatalf("word %q missing from reassembled text %q", word, joined.String())
+			}
+		}
+	})
+
+	t.Run("no chunk exceeds configured limits", func(t *testing.T) {
+		const maxWords = 5
+		const maxChars = 40
+		input := "One two three four five six seven. Eight nine ten eleven twelve thirteen fourteen fifteen."
+		got, err := Prepare(input, Config{
+			MaxWordsPerChunk:  maxWords,
+			MaxCharsPerChunk:  maxChars,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		for _, c := range got {
+			if c.Words > maxWords {
+				t.Fatalf("chunk %d has %d words > limit %d: %q", c.Index, c.Words, maxWords, c.Text)
+			}
+			if c.Chars > maxChars {
+				t.Fatalf("chunk %d has %d chars > limit %d: %q", c.Index, c.Chars, maxChars, c.Text)
+			}
+		}
+	})
+
+	t.Run("oversized sentence is split into smaller parts", func(t *testing.T) {
+		// A single sentence that is far too long for one chunk.
+		input := "This is a very long sentence that goes on and on and on without any stopping point whatsoever even though it should have stopped long ago."
+		got, err := Prepare(input, Config{
+			MaxWordsPerChunk:  10,
+			MaxCharsPerChunk:  60,
+			LongformThreshold: 1,
+		})
+		if err != nil {
+			t.Fatalf("Prepare returned error: %v", err)
+		}
+		if len(got) < 2 {
+			t.Fatalf("expected oversized sentence to be split, got %d chunk(s)", len(got))
+		}
+		for _, c := range got {
+			if c.Words > 10 || c.Chars > 60 {
+				t.Fatalf("chunk exceeds limit: words=%d chars=%d text=%q", c.Words, c.Chars, c.Text)
+			}
+		}
+	})
+
+	t.Run("default config limits are sensible for 20-second window", func(t *testing.T) {
+		cfg := DefaultConfig()
+		// Default limits should be non-zero and reasonable.
+		if cfg.MaxWordsPerChunk <= 0 || cfg.MaxWordsPerChunk > 200 {
+			t.Fatalf("unexpected MaxWordsPerChunk: %d", cfg.MaxWordsPerChunk)
+		}
+		if cfg.MaxCharsPerChunk <= 0 || cfg.MaxCharsPerChunk > 1000 {
+			t.Fatalf("unexpected MaxCharsPerChunk: %d", cfg.MaxCharsPerChunk)
+		}
+	})
 }
