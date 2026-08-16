@@ -47,7 +47,18 @@ docker run --rm \
   --output /output/speech.wav
 ```
 
-The result is a 22.05 kHz mono PCM WAV at `output/speech.wav`.
+The container entrypoint first runs Magpie to produce the WAV, then automatically
+converts it to MP3 using `ffmpeg` with the libmp3lame codec at VBR quality 2
+(`-q:a 2`).  Both files are kept, so the above command produces:
+
+```
+output/
+├── speech.wav
+└── speech.mp3
+```
+
+If `--output` is not supplied the container falls back to executing Magpie
+directly (no MP3 conversion is attempted).
 
 Optional flags include `--seed N` for deterministic generation and
 `--threads N` to control CPU use. Available speakers are `Aria`, `Jason`,
