@@ -5,7 +5,7 @@ ARG DEBIAN_VERSION=bookworm-slim
 FROM debian:${DEBIAN_VERSION} AS builder
 
 ARG MAGPIE_TTS_REF=3008ff73fc2d2da9e4d743b09350aa7023e8980c
-ARG MODEL_URL=https://huggingface.co/nvidia/magpie_tts_multilingual_357m/resolve/main/magpie_tts_multilingual_357m.v2602.f16.gguf
+ARG MODEL_URL=https://huggingface.co/mudler/magpie-tts.cpp-gguf/resolve/main/magpie-tts-multilingual-357m-f16.gguf
 
 RUN apt-get update \
     && apt-get install --no-install-recommends --yes \
@@ -29,7 +29,8 @@ RUN git clone --filter=blob:none --no-checkout https://github.com/mudler/magpie-
 
 RUN mkdir -p /model \
     && curl --fail --location --retry 3 --output /model/model.gguf "${MODEL_URL}" \
-    && test -s /model/model.gguf
+    && test -s /model/model.gguf \
+    && /src/build/examples/cli/magpie-cli info --model /model/model.gguf
 
 FROM debian:${DEBIAN_VERSION}
 
