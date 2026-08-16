@@ -2,6 +2,14 @@
 
 ARG DEBIAN_VERSION=bookworm-slim
 
+FROM golang:1.22-bookworm AS go-builder
+
+WORKDIR /src
+COPY go.mod ./
+COPY textprep/ ./textprep/
+COPY cmd/ ./cmd/
+RUN go build -o /textchunks ./cmd/textchunks
+
 FROM debian:${DEBIAN_VERSION} AS builder
 
 ARG MAGPIE_TTS_REF=3008ff73fc2d2da9e4d743b09350aa7023e8980c
@@ -43,6 +51,7 @@ RUN apt-get update \
     && mkdir /output
 
 COPY --from=builder /src/build/examples/cli/magpie-cli /usr/local/bin/magpie-cli
+COPY --from=go-builder /textchunks /usr/local/bin/textchunks
 COPY --from=builder /model/model.gguf /opt/magpie/model.gguf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 

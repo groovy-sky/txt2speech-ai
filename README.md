@@ -47,9 +47,12 @@ docker run --rm \
   --output /output/speech.wav
 ```
 
-The container entrypoint first runs Magpie to produce the WAV, then automatically
-converts it to MP3 using `ffmpeg` with the libmp3lame codec at VBR quality 2
-(`-q:a 2`).  Both files are kept, so the above command produces:
+The container entrypoint splits the supplied text into bounded chunks (each
+fitting within the model's roughly 20-second generation window), synthesizes
+the chunks serially with `magpie-cli`, concatenates the resulting WAV segments
+in the original order, and finally converts the combined WAV to MP3 using
+`ffmpeg` with the libmp3lame codec at VBR quality 2 (`-q:a 2`).  Both files
+are kept, so the above command produces:
 
 ```
 output/
@@ -57,13 +60,38 @@ output/
 └── speech.mp3
 ```
 
-If `--output` is not supplied the container falls back to executing Magpie
-directly (no MP3 conversion is attempted).
+For text longer than a single model generation (multi-sentence or long-form
+input), pass the full text as one `--text` value.  The entrypoint handles
+splitting automatically:
 
-Optional flags include `--seed N` for deterministic generation and
-`--threads N` to control CPU use. Available speakers are `Aria`, `Jason`,
-`John`, `Leo`, and `Sofia`. Supported language codes are `en`, `es`, `de`,
-`fr`, `it`, `pt-BR`, `hi`, `vi`, `ko`, `ar-AE`, `ar-SA`, and `ar-MSA`.
+```sh
+docker run --rm \
+  -v "$PWD/output:/output" \
+  txt2speech-ai \
+  --text "The quick brown fox jumped over the lazy dog. This is a second sentence that will be synthesized as a separate chunk and then joined. A third sentence completes the example." \
+  --lang en \
+  --speaker Aria \
+  --output /output/speech.wav
+```
+
+Each sentence (or sub-sentence piece if a sentence is unusually long) is
+synthesized independently; the final WAV and MP3 contain all segments in
+order.
+
+All five CLI options are required except `--seed` and `--threads`:
+
+| Option | Description |
+|---|---|
+| `--text TEXT` | Input text (required) |
+| `--lang CODE` | Language code, e.g. `en` (required) |
+| `--speaker NAME` | Speaker voice, e.g. `Aria` (required) |
+| `--output PATH` | Output WAV path (required) |
+| `--seed N` | RNG seed for deterministic generation (optional) |
+| `--threads N` | CPU thread count (optional) |
+
+Available speakers: `Aria`, `Jason`, `John`, `Leo`, `Sofia`.  Supported
+language codes: `en`, `es`, `de`, `fr`, `it`, `pt-BR`, `hi`, `vi`, `ko`,
+`ar-AE`, `ar-SA`, `ar-MSA`.
 
 The runtime is MIT licensed. The model weights are distributed under the
 [`mudler/magpie-tts.cpp-gguf`](https://huggingface.co/mudler/magpie-tts.cpp-gguf)
