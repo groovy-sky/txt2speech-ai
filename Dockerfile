@@ -2,7 +2,7 @@
 
 ARG DEBIAN_VERSION=bookworm-slim
 
-FROM golang:1.22-bookworm AS go-builder
+FROM docker.io/library/golang:1.22-bookworm AS go-builder
 
 WORKDIR /src
 COPY go.mod ./
@@ -10,7 +10,7 @@ COPY textprep/ ./textprep/
 COPY cmd/ ./cmd/
 RUN go build -o /textchunks ./cmd/textchunks
 
-FROM debian:${DEBIAN_VERSION} AS builder
+FROM docker.io/library/debian:${DEBIAN_VERSION} AS builder
 
 ARG MAGPIE_TTS_REF=3008ff73fc2d2da9e4d743b09350aa7023e8980c
 ARG MODEL_URL=https://huggingface.co/mudler/magpie-tts.cpp-gguf/resolve/main/magpie-tts-multilingual-357m-f16.gguf
@@ -40,7 +40,7 @@ RUN mkdir -p /model \
     && test -s /model/model.gguf \
     && /src/build/examples/cli/magpie-cli info --model /model/model.gguf
 
-FROM debian:${DEBIAN_VERSION}
+FROM docker.io/library/debian:${DEBIAN_VERSION}
 
 RUN apt-get update \
     && apt-get install --no-install-recommends --yes \

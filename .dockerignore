@@ -1,4 +1,9 @@
 *
 !Dockerfile
+!go.mod
+!cmd/
+!cmd/**
+!textprep/
+!textprep/**
 !docker/
 !docker/entrypoint.sh
