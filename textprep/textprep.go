@@ -246,7 +246,7 @@ func segment(text string) []string {
 
 	for i := 0; i < len(runes); i++ {
 		switch runes[i] {
-		case '.', '!', '?':
+		case '.', '!', '?', '。', '！', '？':
 			if !isBoundary(runes, i) {
 				continue
 			}
@@ -288,7 +288,7 @@ func segment(text string) []string {
 
 func isBoundary(runes []rune, i int) bool {
 	r := runes[i]
-	if r == '!' || r == '?' {
+	if r == '!' || r == '?' || r == '！' || r == '？' || r == '。' {
 		return true
 	}
 
@@ -466,7 +466,7 @@ func fallbackSplit(sentence string, cfg Config) []string {
 
 		breakPos := 0
 		for i := lastGood - 1; i >= 1; i-- {
-			if runes[i] == ',' || runes[i] == ';' || runes[i] == ':' {
+			if isFallbackPunctuation(runes[i]) {
 				breakPos = i + 1
 				break
 			}
@@ -529,7 +529,7 @@ func runeLen(s string) int {
 }
 
 func isSentenceEnd(r rune) bool {
-	return r == '.' || r == '!' || r == '?'
+	return r == '.' || r == '!' || r == '?' || r == '。' || r == '！' || r == '？'
 }
 
 func lastNonSpaceRune(s string) rune {
@@ -547,4 +547,13 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func isFallbackPunctuation(r rune) bool {
+	switch r {
+	case ',', ';', ':', '，', '；', '：', '、', '—', '–':
+		return true
+	default:
+		return false
+	}
 }

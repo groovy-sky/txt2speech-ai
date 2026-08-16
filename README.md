@@ -78,7 +78,8 @@ Each sentence (or sub-sentence piece if a sentence is unusually long) is
 synthesized independently; the final WAV and MP3 contain all segments in
 order.
 
-All five CLI options are required except `--seed` and `--threads`:
+The core CLI options `--text`, `--lang`, `--speaker`, and `--output` are
+required. `--seed`, `--threads`, and the chunk-tuning flags are optional:
 
 | Option | Description |
 |---|---|
@@ -88,6 +89,9 @@ All five CLI options are required except `--seed` and `--threads`:
 | `--output PATH` | Output WAV path (required) |
 | `--seed N` | RNG seed for deterministic generation (optional) |
 | `--threads N` | CPU thread count (optional) |
+| `--max-words N` | Override the per-chunk word cap used for long-text splitting (optional) |
+| `--max-chars N` | Override the per-chunk rune/character cap used for long-text splitting (optional) |
+| `--longform-threshold N` | Override the text length at which longform chunking is forced (optional) |
 
 Available speakers: `Aria`, `Jason`, `John`, `Leo`, `Sofia`.  Supported
 language codes: `en`, `es`, `de`, `fr`, `it`, `pt-BR`, `hi`, `vi`, `ko`,
@@ -129,4 +133,15 @@ Run the package tests with:
 
 ```sh
 go test ./textprep/
+```
+
+The `textchunks` CLI also exposes the same optional chunking controls used by the
+container entrypoint:
+
+```sh
+go run ./cmd/textchunks \
+  --text "First sentence. Second sentence. Third sentence." \
+  --max-words 2 \
+  --max-chars 20 \
+  --longform-threshold 1
 ```

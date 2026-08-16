@@ -8,6 +8,9 @@ speaker=""
 seed=""
 threads=""
 output=""
+max_words=""
+max_chars=""
+longform_threshold=""
 
 needs_value_for=""
 
@@ -20,6 +23,9 @@ for arg in "$@"; do
             seed)    seed="$arg" ;;
             threads) threads="$arg" ;;
             output)  output="$arg" ;;
+            max_words) max_words="$arg" ;;
+            max_chars) max_chars="$arg" ;;
+            longform_threshold) longform_threshold="$arg" ;;
         esac
         needs_value_for=""
         continue
@@ -38,6 +44,12 @@ for arg in "$@"; do
         --threads=*) threads="${arg#--threads=}" ;;
         --output)    needs_value_for=output ;;
         --output=*)  output="${arg#--output=}" ;;
+        --max-words) needs_value_for=max_words ;;
+        --max-words=*) max_words="${arg#--max-words=}" ;;
+        --max-chars) needs_value_for=max_chars ;;
+        --max-chars=*) max_chars="${arg#--max-chars=}" ;;
+        --longform-threshold) needs_value_for=longform_threshold ;;
+        --longform-threshold=*) longform_threshold="${arg#--longform-threshold=}" ;;
         *)
             printf 'unknown option: %s\n' "$arg" >&2
             exit 2
@@ -62,21 +74,35 @@ case "$output" in
     *)               mp3_output="${output}.mp3" ;;
 esac
 
-# Build the base magpie-cli argument list (text and output are per-chunk).
-magpie_base="--model /opt/magpie/model.gguf --lang $lang --speaker $speaker"
-if [ -n "$seed" ];    then magpie_base="$magpie_base --seed $seed"; fi
-if [ -n "$threads" ]; then magpie_base="$magpie_base --threads $threads"; fi
-
 # Create a per-run temp directory and ensure cleanup on exit.
-tmpdir=$(mktemp -d)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/txt2speech-ai.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 trap cleanup EXIT
 
 # Split text into TTS chunks; one chunk per line.
 chunks_file="$tmpdir/chunks.txt"
-textchunks --text "$text" > "$chunks_file"
+set -- --text "$text"
+if [ -n "$max_words" ]; then
+    set -- "$@" --max-words "$max_words"
+fi
+if [ -n "$max_chars" ]; then
+    set -- "$@" --max-chars "$max_chars"
+fi
+if [ -n "$longform_threshold" ]; then
+    set -- "$@" --longform-threshold "$longform_threshold"
+fi
+if ! textchunks "$@" > "$chunks_file"; then
+    printf 'error: failed to split text into TTS-safe chunks\n' >&2
+    exit 1
+fi
 
 if [ ! -s "$chunks_file" ]; then
+    printf 'error: no text chunks produced\n' >&2
+    exit 1
+fi
+
+total_chunks=$(grep -cve '^[[:space:]]*$' "$chunks_file")
+if [ "$total_chunks" -eq 0 ]; then
     printf 'error: no text chunks produced\n' >&2
     exit 1
 fi
@@ -89,9 +115,19 @@ idx=0
 while IFS= read -r chunk; do
     [ -z "$chunk" ] && continue
     seg="$tmpdir/seg_${idx}.wav"
-    # shellcheck disable=SC2086
-    magpie-cli say $magpie_base --text "$chunk" --output "$seg"
-    printf 'file %s\n' "$seg" >> "$concat_list"
+    set -- say --model /opt/magpie/model.gguf --lang "$lang" --speaker "$speaker"
+    if [ -n "$seed" ]; then
+        set -- "$@" --seed "$seed"
+    fi
+    if [ -n "$threads" ]; then
+        set -- "$@" --threads "$threads"
+    fi
+    set -- "$@" --text "$chunk" --output "$seg"
+    if ! magpie-cli "$@"; then
+        printf 'error: synthesis failed for chunk %d of %d\n' "$((idx + 1))" "$total_chunks" >&2
+        exit 1
+    fi
+    printf "file '%s'\n" "$seg" >> "$concat_list"
     idx=$((idx + 1))
 done < "$chunks_file"
 
@@ -104,18 +140,24 @@ fi
 if [ "$idx" -eq 1 ]; then
     cp "$tmpdir/seg_0.wav" "$output"
 else
-    ffmpeg -y -nostdin -f concat -safe 0 \
+    if ! ffmpeg -y -nostdin -f concat -safe 0 \
         -i "$concat_list" \
         -c:a pcm_s16le \
-        "$output"
+        "$output"; then
+        printf 'error: failed to concatenate %d audio chunks\n' "$idx" >&2
+        exit 1
+    fi
 fi
 
 # Convert the final WAV to MP3.
-ffmpeg -y -nostdin \
+if ! ffmpeg -y -nostdin \
     -i "$output" \
     -vn \
     -codec:a libmp3lame \
     -q:a 2 \
-    "$mp3_output"
+    "$mp3_output"; then
+    printf 'error: failed to convert WAV to MP3\n' >&2
+    exit 1
+fi
 
 printf 'Created MP3: %s\n' "$mp3_output"
