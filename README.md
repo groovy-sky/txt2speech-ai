@@ -57,3 +57,37 @@ Optional flags include `--seed N` for deterministic generation and
 The runtime is MIT licensed. The model weights are distributed under the
 [`mudler/magpie-tts.cpp-gguf`](https://huggingface.co/mudler/magpie-tts.cpp-gguf)
 repository license.
+
+## Go text preparation package
+
+This repository also includes a small Go package for preparing free-form text
+for NVIDIA Magpie TTS longform synthesis. It sanitizes copied text, segments it
+into sentence-like units, and packs those units into bounded chunks with
+deterministic metadata.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/groovy-sky/txt2speech-ai/textprep"
+)
+
+func main() {
+	chunks, err := textprep.Prepare("Dr. Smith went home.\nHe slept.", textprep.DefaultConfig())
+	if err != nil {
+		panic(err)
+	}
+
+	for _, chunk := range chunks {
+		fmt.Printf("%d: %q BOT=%t EOT=%t\n", chunk.Index, chunk.Text, chunk.BOT, chunk.EOT)
+	}
+}
+```
+
+Run the package tests with:
+
+```sh
+go test ./textprep/
+```
