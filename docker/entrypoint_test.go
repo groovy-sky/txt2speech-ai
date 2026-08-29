@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+
 func TestEntrypointLongTextSequentialMerge(t *testing.T) {
 	repoRoot := repositoryRoot(t)
 	tmpRoot := t.TempDir()
