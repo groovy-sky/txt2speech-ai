@@ -34,6 +34,17 @@ docker build \
   -t txt2speech-ai .
 ```
 
+## Publish to GitHub Container Registry
+
+The GitHub Actions workflow builds pull requests and publishes
+`ghcr.io/<owner>/<repository>` when `Dockerfile` or a file under `docker/`
+changes on any branch. It authenticates with the built-in `GITHUB_TOKEN`, so
+no custom repository variables or secrets are required.
+
+The workflow publishes `latest` from the default branch, the branch or Git
+tag, and a `sha-<commit>` tag. Pull requests only build the image and do not
+push it.
+
 ## Convert text to audio
 
 ```sh
